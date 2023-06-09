@@ -3,6 +3,8 @@ const User = require("../models/user.js");
 const bcrypt = require("bcrypt");
 const jwt = require("../services/jwt");
 const Moongoosepaginate = require("mongoose-pagination");
+const fs = require("fs");
+const path = require("path");
 
 const testUser = (req, res) => {
   return res.status(200).send({
@@ -10,7 +12,6 @@ const testUser = (req, res) => {
     user: req.user,
   });
 };
-
 // user register
 const register = async (req, res) => {
   //get data from collection
@@ -241,9 +242,13 @@ const updateUser = async (req, res) => {
     userToUpdate.password = passhashed;
 
     try {
-      const userUpdated = await User.findByIdAndUpdate(userIdentity.id, userToUpdate, {
-        new: true,
-      });
+      const userUpdated = await User.findByIdAndUpdate(
+        userIdentity.id,
+        userToUpdate,
+        {
+          new: true,
+        }
+      );
 
       return res.status(200).send({
         status: "success",
@@ -264,7 +269,96 @@ const updateUser = async (req, res) => {
     });
   }
 };
+const uploadImage = async (req, res) => {
+  if (!req.file) {
+    return res.status(200).send({
+      status: "error",
+      message: "image not found",
+    });
+  }
 
+  let imageFile = req.file.originalname;
+
+  // get extension
+
+  const imageFileExtension = imageFile.split(".");
+  const extension = imageFileExtension[1];
+
+  //confirm extension
+
+  if (
+    extension != "png" &&
+    extension != "jpg" &&
+    extension != "jpeg" &&
+    extension != "gif"
+  ) {
+    //get fil path to delete the wrong extension file
+    const filePath = req.file.path;
+    console.log(filePath);
+    //delete file looking in the path
+    const fileDeleted = fs.unlinkSync(filePath);
+    //response with error message
+    return res.status(400).send({
+      status: "error",
+      message: "Invalid extension file",
+      file: filePath,
+    });
+  };
+
+
+  // upload imagefile
+  try {
+    const imageUploaded = await User.findByIdAndUpdate(
+      {_id: req.user.id},
+      { image: req.file.filename },
+      { new: true }
+    );
+
+    return res.status(200).send({
+      message: "Success",
+      user: req.user.name,
+      file: req.file,
+
+    });
+
+  } catch (error) {
+
+    return res.status(500).send({
+      status: "error",
+      message: "error traiying to upload file",
+      error,
+    });
+  }
+
+
+
+};
+
+const getAvatar = async (req, res) => {
+
+  const file = req.params.file;
+
+  const filePath = "./images/avatars/" + file
+
+  console.log(filePath);
+
+  // if exists
+  fs.stat(filePath,(error,exist) => {
+
+    if (!exist){
+      return res.status(404).send({
+        status: "error",
+        message: "File does not exist"
+      })
+    }
+
+    //response file existed
+    return res.sendFile(path.resolve(filePath));
+  })
+
+
+
+}
 module.exports = {
   testUser,
   register,
@@ -272,4 +366,6 @@ module.exports = {
   getOneUserProfile,
   getListOfUsers,
   updateUser,
+  uploadImage,
+  getAvatar,
 };
