@@ -1,10 +1,14 @@
 //import model
 const User = require("../models/user.js");
+const Follow = require("../models/follow.js");
+const Publication = require("../models/publications");
+//import libraries
 const bcrypt = require("bcrypt");
 const jwt = require("../services/jwt");
 const Moongoosepaginate = require("mongoose-pagination");
 const fs = require("fs");
 const path = require("path");
+const followService = require("../services/followUserIds");
 
 const testUser = (req, res) => {
   return res.status(200).send({
@@ -144,9 +148,13 @@ const getOneUserProfile = async (req, res) => {
       });
     }
 
+    const followinfo = await followService.doIFollowThisUser(req.user.id, id);
+
     return res.status(200).send({
       status: "success",
       user: userProfile,
+      following: followinfo.following,
+      follower: followinfo.followers,
     });
   } catch (error) {
     return res.status(500).json({
@@ -170,7 +178,10 @@ const getListOfUsers = async (req, res) => {
   let itemPerPage = 5;
 
   try {
-    const listUsers = await User.find().sort("_id").paginate(page, itemPerPage);
+    const listUsers = await User.find()
+      .select("-password -email -role -__v")
+      .sort("_id")
+      .paginate(page, itemPerPage);
     const totalUsers = await User.find().sort("_id");
 
     const total = parseInt(totalUsers.length);
@@ -182,6 +193,8 @@ const getListOfUsers = async (req, res) => {
       });
     }
 
+    const followinfo = await followService.followUserIds(req.user.id);
+
     return res.status(200).send({
       status: "success",
       message: "List of users",
@@ -190,6 +203,8 @@ const getListOfUsers = async (req, res) => {
       itemPerPage,
       total,
       pages: Math.ceil(total / itemPerPage),
+      following: followinfo.following,
+      follower: followinfo.followers,
     });
   } catch (error) {
     return res.status(404).send({
@@ -207,10 +222,6 @@ const updateUser = async (req, res) => {
   delete userToUpdate.iat;
   delete userToUpdate.exp;
   delete userToUpdate.rol;
-  console.log("--------------------------------existing data");
-  console.log(userIdentity);
-  console.log("--------------------------------new info");
-  console.log(userToUpdate);
 
   try {
     // user duplicate record control
@@ -237,9 +248,14 @@ const updateUser = async (req, res) => {
     }
     // encrypt password
     const salt = await bcrypt.genSalt(10);
-    const passhashed = await bcrypt.hash(userToUpdate.password, salt);
 
-    userToUpdate.password = passhashed;
+    if (userToUpdate.password) {
+      const passhashed = await bcrypt.hash(userToUpdate.password, salt);
+      userToUpdate.password = passhashed;
+    }else{
+      delete userToUpdate.password;
+    }
+
 
     try {
       const userUpdated = await User.findByIdAndUpdate(
@@ -303,13 +319,12 @@ const uploadImage = async (req, res) => {
       message: "Invalid extension file",
       file: filePath,
     });
-  };
-
+  }
 
   // upload imagefile
   try {
     const imageUploaded = await User.findByIdAndUpdate(
-      {_id: req.user.id},
+      { _id: req.user.id },
       { image: req.file.filename },
       { new: true }
     );
@@ -318,47 +333,63 @@ const uploadImage = async (req, res) => {
       message: "Success",
       user: req.user.name,
       file: req.file,
-
     });
-
   } catch (error) {
-
     return res.status(500).send({
       status: "error",
       message: "error traiying to upload file",
       error,
     });
   }
-
-
-
 };
 
 const getAvatar = async (req, res) => {
-
   const file = req.params.file;
 
-  const filePath = "./images/avatars/" + file
+  const filePath = "./images/avatars/" + file;
 
   console.log(filePath);
 
   // if exists
-  fs.stat(filePath,(error,exist) => {
-
-    if (!exist){
+  fs.stat(filePath, (error, exist) => {
+    if (!exist) {
       return res.status(404).send({
         status: "error",
-        message: "File does not exist"
-      })
+        message: "File does not exist",
+      });
     }
 
     //response file existed
     return res.sendFile(path.resolve(filePath));
-  })
+  });
+};
 
+const counters = async (req, res) => {
+  let userId = req.user.id;
 
+  if (req.params.id) {
+    userId = req.params.id;
+  }
 
-}
+  try {
+    const following = await Follow.count({ user: userId });
+    const followed = await Follow.count({ followed: userId });
+    const publications = await Publication.count({ user: userId });
+
+    return res.status(200).send({
+      status: "success",
+      message: "Counters",
+      number_of_followed_users: followed,
+      number_of_following_users: following,
+      number_of_publications: publications,
+    });
+  } catch (error) {
+    return res.status(200).send({
+      status: "Error",
+      message: "Failed to find data",
+    });
+  }
+};
 module.exports = {
   testUser,
   register,
@@ -368,4 +399,5 @@ module.exports = {
   updateUser,
   uploadImage,
   getAvatar,
+  counters
 };

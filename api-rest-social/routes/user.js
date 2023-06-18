@@ -13,8 +13,9 @@ const storage = multer.diskStorage({
     cb(null, "avatar-" + Date.now() + "-" + file.originalname);
   },
 });
+
 // multer object
-const uploads = multer({storage});
+const uploads = multer({ storage });
 
 router.get("/test-user", check.authentification, UserController.testUser);
 // get one user profile
@@ -29,15 +30,11 @@ router.get(
   check.authentification,
   UserController.getListOfUsers
 );
-
 // get avatar image
-router.get(
-  "/avatar/:file",
-  check.authentification,
-  UserController.getAvatar
-);
+router.get("/avatar/:file", check.authentification, UserController.getAvatar);
 
-
+// get count of followers, following users, and publications
+router.get("/counters/:id", check.authentification, UserController.counters);
 // register user
 router.post("/register", UserController.register);
 // login user
@@ -48,9 +45,7 @@ router.post(
   [check.authentification, uploads.single("file0")],
   UserController.uploadImage
 );
-
 //update user
-
 router.put("/update", check.authentification, UserController.updateUser);
 
 module.exports = router;

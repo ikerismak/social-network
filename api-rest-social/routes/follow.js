@@ -11,6 +11,7 @@ router.get('/test-follow', FollowController.testFollow);
 //Followed users
 router.get('/followeduserlist/:id?/:page?',check.authentification, FollowController.getFollowedUserslist);
 //List of followers
+router.get('/followerslist/:id?/:page?',check.authentification, FollowController.getFollowers);
 
 //Follow user
 router.post('/follow-user',check.authentification,FollowController.followUser);
@@ -18,7 +19,8 @@ router.post('/follow-user',check.authentification,FollowController.followUser);
 //Unfollow user
 router.delete('/unfollow-user/:id',check.authentification,FollowController.unfollow);
 
-//
+
+
 
 
 

@@ -2,7 +2,7 @@ const { findById } = require("../models/follow.js");
 const Follow = require("../models/follow.js");
 const User = require("../models/user.js");
 const Moongoosepaginate = require("mongoose-pagination");
-const followService = require("../services/followUserIds")
+const followService = require("../services/followUserIds");
 
 const testFollow = (req, res) => {
   return res.status(200).send({
@@ -96,16 +96,22 @@ const getFollowedUserslist = async (req, res) => {
     const followedUsersLIst = await Follow.find({
       user: userIdentified,
     })
-      .populate("user followed", "-password -role -__v")
+      .populate("user followed", "-password -role -__v -email")
       .paginate(page, itemsPerPage);
 
     const total = parseInt(followedUsersLIst.length);
+
+    //list of user id´s that i follow and they are follow me
+
+    let followUserIds = await followService.followUserIds(userIdentified);
 
     return res.status(200).send({
       message: "List of follows",
       followedUsersLIst,
       total,
       pages: Math.ceil(total / itemsPerPage),
+      followed_users: followUserIds.following,
+      folloers: followUserIds.followers,
     });
   } catch (error) {
     return res.status(404).send({
@@ -115,9 +121,57 @@ const getFollowedUserslist = async (req, res) => {
   }
 };
 
+const getFollowers = async (req, res) => {
+
+  const userIdentified = req.user.id;
+
+
+  if (req.params.ide) userIdentified = req.params.id;
+
+  let page = 1;
+
+  if (req.params.page) page = req.params.page;
+
+  const itemsPerPage = 5;
+
+  try {
+    //populate:  brings the complete object related with the id that the user is following
+    //paginate:  only shows a few items per page and made more pages
+    const followersLIst = await Follow.find({
+      followed: userIdentified,
+    })
+      .populate("user", "-password -role -__v -email")
+      .paginate(page, itemsPerPage);
+
+    const total = parseInt(followersLIst.length);
+
+    //list of user id´s that i follow and they are follow me
+
+    let followUserIds = await followService.followUserIds(userIdentified);
+
+    return res.status(200).send({
+      message: "List of followers",
+      followersLIst,
+      total,
+      pages: Math.ceil(total / itemsPerPage),
+      followed_users: followUserIds.following,
+      folloers: followUserIds.followers,
+    });
+  } catch (error) {
+    return res.status(404).send({
+      status: error,
+      message: "Filed to found this request",
+    });
+  }
+
+
+
+}
+
 module.exports = {
   testFollow,
   followUser,
   unfollow,
   getFollowedUserslist,
+  getFollowers
 };
